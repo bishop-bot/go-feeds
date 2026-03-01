@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/mmcdole/gofeed"
@@ -12,6 +13,16 @@ import (
 
 type Feed struct {
 	URL string
+}
+
+type FeedJob struct {
+	ID  int
+	URL string
+}
+
+type FeedResult struct {
+	ID     int
+	Status string
 }
 
 func (f *Feed) Fetch(ctx context.Context) (*gofeed.Feed, error) {
@@ -44,15 +55,34 @@ func (f *Feed) Fetch(ctx context.Context) (*gofeed.Feed, error) {
 }
 
 func FetchAll(ctx context.Context, feeds *[]string) ([]*gofeed.Feed, error) {
-	var allFeeds []*gofeed.Feed
-	for _, feedURL := range *feeds {
-		feed := &Feed{URL: feedURL}
-		parsedFeed, err := feed.Fetch(ctx)
-		if err != nil {
-			log.Error().Err(err).Msgf("Failed to fetch feed from URL: %s", feedURL)
-			continue // Skip this feed and continue with the next one
-		}
-		allFeeds = append(allFeeds, parsedFeed)
+	const maxWorkers = 5
+	feedJobs := make(chan FeedJob, len(*feeds))
+	semaphore := make(chan struct{}, maxWorkers)
+	wg := &sync.WaitGroup{}
+
+	// Start worker goroutines
+	for i := 0; i < len(*feeds); i++ {
+		feedJobs <- FeedJob{ID: i, URL: (*feeds)[i]}
 	}
-	return allFeeds, nil
+	close(feedJobs)
+
+	for job := range feedJobs {
+		wg.Add(1)
+		go func(job FeedJob) {
+			defer wg.Done()
+			semaphore <- struct{}{}        // Acquire a slot
+			defer func() { <-semaphore }() // Release the slot
+
+			feed := &Feed{URL: job.URL}
+			_, err := feed.Fetch(ctx)
+			if err != nil {
+				log.Error().Err(err).Msgf("Failed to fetch feed for job ID: %d", job.ID)
+			} else {
+				log.Info().Msgf("Successfully fetched feed for job ID: %d", job.ID)
+			}
+		}(job)
+	}
+
+	wg.Wait()
+	return nil, nil
 }

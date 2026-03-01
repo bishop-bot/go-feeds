@@ -9,13 +9,23 @@ import (
 )
 
 type Config struct {
-	Project string   `yaml:"project"`
-	Feeds   []string `yaml:"feeds"`
+	Project    string   `yaml:"project"`
+	MaxWorkers int      `yaml:"maxWorkers"`
+	Feeds      []string `yaml:"feeds"`
+}
+
+func NewConfig() Config {
+	return Config{
+		Project:    "go-feeds",
+		MaxWorkers: 5,
+		Feeds:      []string{},
+	}
 }
 
 // LoadConfig loads the configuration from a YAML file.
 func LoadConfig(filename string) (*Config, error) {
-	var config Config
+	// default config
+	config := NewConfig()
 
 	// Read the YAML file
 	data, err := os.ReadFile(filename)
