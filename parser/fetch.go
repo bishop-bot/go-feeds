@@ -56,6 +56,7 @@ func (f *Feed) Fetch(ctx context.Context) (*gofeed.Feed, error) {
 
 func FetchAll(ctx context.Context, feeds *[]string) ([]*gofeed.Feed, error) {
 	const maxWorkers = 5
+	results := []*gofeed.Feed{}
 	feedJobs := make(chan FeedJob, len(*feeds))
 	semaphore := make(chan struct{}, maxWorkers)
 	wg := &sync.WaitGroup{}
@@ -74,15 +75,16 @@ func FetchAll(ctx context.Context, feeds *[]string) ([]*gofeed.Feed, error) {
 			defer func() { <-semaphore }() // Release the slot
 
 			feed := &Feed{URL: job.URL}
-			_, err := feed.Fetch(ctx)
+			parsedFeed, err := feed.Fetch(ctx)
 			if err != nil {
 				log.Error().Err(err).Msgf("Failed to fetch feed for job ID: %d", job.ID)
 			} else {
 				log.Info().Msgf("Successfully fetched feed for job ID: %d", job.ID)
+				results = append(results, parsedFeed)
 			}
 		}(job)
 	}
 
 	wg.Wait()
-	return nil, nil
+	return results, nil
 }

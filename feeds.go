@@ -23,6 +23,4 @@ func main() {
 		log.Error().Err(err).Msg("Failed to fetch feeds")
 		return
 	}
-
-	// log.Info().Msgf("Feed Title: %s", parsedFeed.Title)
 }
