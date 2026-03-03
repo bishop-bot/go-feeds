@@ -1,0 +1,5 @@
+project: go-feeds
+maxWorkers: 5
+feeds:
+  - https://feeds.bloomberg.com/markets/news.rss
+  - https://feeds.content.dowjones.io/public/rss/RSSMarketsMain
